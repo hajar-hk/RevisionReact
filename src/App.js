@@ -1,10 +1,11 @@
 import logo from './logo.svg';
 import './App.css';
 
-import TodoItem from './components/TodoItem';
 import TodoForm from './components/TodoForm'; 
 import TodoList from './components/TodoList';
 import { useState, useEffect } from 'react';
+import axios from 'axios';
+
 
 function App() {
 
@@ -12,42 +13,73 @@ function App() {
   // pour stocker la liste
   const [tache, setache] = useState([]); // tab vide
 
-  // ranger la tache dans localstorage
-  useEffect(() => {
-    localStorage.setItem("tache", JSON.stringify(tache));
-  }, [tache]);
+  const [loading, setLoading] = useState(false);  // État chargement
+  const [error, setError] = useState(null);  // Etat d'erreur
 
-  // prendre la tache depuis localstorage et le mettre dans settache
+
+  // prendre la tache depuis l'api et le mettre dans settache (get)
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("tache"));
-    setache(saved);
+    async function gettodo() {
+      try{
+        const response =  await axios.get('http://localhost:3001/todos');
+        setache(response.data);
+      } catch (error){
+        console.log('Erreur', error);
+      }
+    }
+    gettodo();
   },[]);
+    
+  // Ajouter une nouvelle tâche (post)
+  const addtodo = async (text) => {
 
-
-   const onAdd = (todo) => {
-     // cree objet  et l'ajouter tableau
-    const nouvelletache = {
-      id: Date.now(),
-      text: todo,
-      completed: false,
+    setLoading(true);           //  Début chargement
+    setError(null);            //  Reset erreurs
+    try {
+      const nouvelleTache = {
+        text: text,
+        completed: false
+      };
+      const response = await axios.post('http://localhost:3001/todos', nouvelleTache);
+      setache([...tache, response.data]);
+      setLoading(false); // Fin chargement
+    } catch (error) {
+      setError("Erreur d'ajout"); //  Stocke l'erreur
+      setLoading(false); //  Fin chargement même en erreur
     }
-    setache([...tache,nouvelletache]);
-   }
+  };
+  
+  // maj d'une tache (put)
+  async function majtodo(id) {
+    try{
+      // 1. Trouver la tâche à modifier
+const tacheAModifier = tache.find(todo => todo.id === id);
 
-   const onChecked = (id) => {
-   setache(tache.map((todo) => {
-    if (todo.id === id) {
-          // Retourner une COPIE modifiée
-      return { ...todo, completed: !todo.completed };
-    }
-    return todo;
-   }));
-   }
+// 2. Créer la version modifiée
+const tacheModifiee = { ...tacheAModifier, completed: !tacheAModifier.completed };
 
-const onDelete = (id) => {
-  setache(tache.filter((todo) => todo.id !== id));
-}
+// 3. Envoyer la version modifiée dans le body
+await axios.put(`http://localhost:3001/todos/${id}`, tacheModifiee);
+ 
+      // Mettre à jour le state
+      setache(tache.map(todo => 
+        todo.id === id ? tacheModifiee : todo
+      ));
 
+    }catch(error){
+      console.log('erreur', error);
+    } 
+  }
+
+  // supprimer une tache (delete)
+  async function deletetodo(id) {
+    try{
+      const response = await axios.delete(`http://localhost:3001/todos/${id}`);
+      setache(prevTache => prevTache.filter(todo => todo.id !== id));
+       }catch(error){
+      console.log('erreur', error);
+    }  
+  }
 
 const tachesFiltrees =  tache.filter((todo) => {
   if (filtreActif === 'actifs') return todo.completed === false;
@@ -59,13 +91,15 @@ const tachesFiltrees =  tache.filter((todo) => {
 
   return(
   <div className="todo-container">
-    <TodoForm onAction={onAdd} />
+    {loading && <div className="loading">Chargement...</div>}
+    {error && <div className="error">Erreur: {error}</div>}
+    <TodoForm onAction={addtodo} />
     <div className="filter-buttons">
       <button onClick={() => setFiltreActif('tous')}>Tous</button>
       <button onClick={() => setFiltreActif('actifs')}>Actifs</button>
       <button onClick={() => setFiltreActif('termines')}>Terminés</button>
     </div>
-    <TodoList tache={tachesFiltrees} onChecked={onChecked} onDelete={onDelete} />
+    <TodoList tache={tachesFiltrees} onChecked={majtodo} onDelete={deletetodo} />
   </div>
 );
 }

@@ -6,7 +6,7 @@ function TodoItem({ tache, onCheked, onDelete }) {
       <input
         type="checkbox"
         name="tache"
-        checked={tache.completed}
+        checked={tache.completed || false}
         onChange={() => onCheked(tache.id)}
       />
       <label htmlFor="tache">{tache.text}</label>
